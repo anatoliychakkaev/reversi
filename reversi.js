@@ -57,7 +57,7 @@
                 board[t_i][t_j] = color;
                 try_vector(dir, delta - 1);
             } else if (vector_state == 'check') {
-                if (0 <= t_i < 8 && 0 <= t_j < 8) {
+                if (0 <= t_i && t_i < 8 && 0 <= t_j && t_j < 8) {
                     if (board[t_i][t_j] == opcolor) {
                         try_vector(dir, delta + 1);
                     } else if (board[t_i][t_j] == color && delta > 1) {
