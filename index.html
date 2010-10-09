@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+  <meta http-equiv="Content-type" content="text/html; charset=utf-8" />
+  <script src="jquery.js"></script>
+  <script src="reversi.js"></script>
+  <script>
+    $(function () {
+      $('body').reversi();
+    });
+  </script>
+  <style>
+    table.reversi {
+      border-collapse: collapse;
+    }
+
+    .reversi td {
+      width: 74px;
+      height: 74px;
+      border: 1px solid #aaa;
+      background: #3465a4;
+      text-indent: -3000px;
+    }
+
+    .reversi td.info {
+      text-indent: 10px;
+      font-width: 700;
+      font-size: 20px;
+      font-family: ubuntu, verdana, sans-serif;
+      color: white;
+    }
+
+    .reversi td.black {
+      background: #3465a4 url(b.png) no-repeat 4px 4px;
+    }
+
+    .reversi td.white {
+      background: #3465a4 url(w.png) no-repeat 4px 4px;
+    }
+  </style>
+  <body>
+  </body>
+</html>
