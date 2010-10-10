@@ -20,13 +20,13 @@
         '2 1 3 3 3 3 1 2'.split(' '),
         '9 2 4 4 4 4 2 9'.split(' ')
     ];
-    function empty(i, j) {
+    function empty(board, i, j) {
         return board[i][j] != 'w' && board[i][j] != 'b';
     }
     function draw_board() {
         var html = '<table class="reversi">', data = '';
         if (end_game) {
-            html += '<tr><td colspan="8" class="info">Победа ' + (end_game == 'w' ? 'белых' : 'черных') + '</td></tr>';
+            html += '<tr><td colspan="8" class="info">Победа ' + (end_game == 'b' ? 'черных' : 'белых') + '</td></tr>';
         } else {
             html += '<tr><td colspan="8" class="info">Ход ' + (black ? 'Черных' : 'Белых') + '</td>';
         }
@@ -34,7 +34,7 @@
             html += '<tr>';
             for (var j = 0; j < 8; j++) {
                 data = ' data-coords="' + i + ':' + j + '"';
-                if (empty(i, j)) {
+                if (empty(board, i, j)) {
                     html += '<td class="empty"' + data +'>&nbsp;</td>';
                 } else if (board[i][j] == 'b') {
                     html += '<td class="black"' + data +'>b</td>';
@@ -47,24 +47,80 @@
         html += '</table>';
         container.html(html);
     }
+    function try_vector(black, board, point, action, dir, delta, move_state) {
+        var color = black ? 'b' : 'w',
+            opcolor = black ? 'w' : 'b',
+            t_i = point.i + delta * dir[0],
+            t_j = point.j + delta * dir[1], new_delta = 0;
+        if (typeof move_state == 'undefined') {
+            move_state = false;
+        }
+        if (action == 'turn' && delta > 0) {
+            board[t_i][t_j] = color;
+            new_delta = delta - 1;
+        } else if (action == 'check' || action == 'look') {
+            if (0 <= t_i && t_i < 8 && 0 <= t_j && t_j < 8) {
+                if (board[t_i][t_j] == opcolor) {
+                    new_delta = delta + 1;
+                } else if (board[t_i][t_j] == color && delta > 1) {
+                    if (action == 'look') {
+                        return true;
+                    }
+                    move_state = true;
+                    action = 'turn';
+                    new_delta = delta - 1;
+                }
+            }
+        }
+        if (new_delta == 0) {
+            return move_state;
+        } else {
+            return try_vector(black, board, point, action, dir, new_delta, move_state)
+        }
+    }
+    function vectors(black, board, point, action) {
+        var move_state = false;
+        for (var d in matrix) {
+            if (matrix.hasOwnProperty(d)) {
+                if (try_vector(black, board, point, action, matrix[d], 1)) {
+                    move_state = true;
+                }
+            }
+        }
+        return move_state;
+    }
+    function can_move(black) {
+        for (i = 0; i < 8; i++) {
+            for (j = 0; j < 8; j++) {
+                if (empty(board, i, j)) {
+                    if (vectors(black, board, {i: i, j: j}, 'look')) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
     var matrix = { 1: [0, 1], 2: [0, -1], 3: [1, 0], 4: [-1, 0], 5: [1, -1], 6: [1, 1], 7: [-1, -1], 8: [-1, 1] };
-    function clone_board_in_ai_mind() {
-        var row;
-        think_board = [];
+    function clone_board(board) {
+        var row, b = [];
         for (var i = 0; i < 8; i++) {
             row = [];
             for (var j = 0; j < 8; j++) {
                 row.push(board[i][j]);
             }
-            think_board.push(row);
+            b.push(row);
         }
+        return b;
     }
-    function estimate_board_in_mind(color) {
-        var cost = 0;
+    function estimate(board, color) {
+        var cost = 0, m = 1, c;
         for (var i = 0; i < 8; i++) {
             for (var j = 0; j < 8; j++) {
-                if (think_board[i][j] == color) {
-                    cost += parseInt(costs[i][j], 10);
+                c = board[i][j];
+                if (c != '0') {
+                    m = c == color ? 1 : -1;
+                    cost += parseInt(costs[i][j], 10) * m;
                 }
             }
         }
@@ -73,126 +129,86 @@
     function move(e) {
         var cell = this;
         var coords = $(cell).attr('data-coords').split(':');
-        do_move(parseInt(coords[0], 10), parseInt(coords[1], 10));
+        black = do_move(black, parseInt(coords[0], 10), parseInt(coords[1], 10));
         draw_board();
-        ai_move();
+        ai_move(black);
     }
     function ai_move() {
         if (!black) {
             setTimeout(function () {
-                do_move();
+                black = do_move(black);
                 draw_board();
                 if (!black && !end_game) {
-                    ai_move();
+                    ai_move(black);
                 }
             }, 500);
         }
     }
-    function do_move(i, j) {
-        var vector_state = '', move_state = false, vector;
-        var color = black ? 'b' : 'w';
-        var opcolor = black ? 'w' : 'b';
+    function for_each_empty_cell(board, doit) {
+        var i, j;
+        for (i = 0; i < 8; i++) {
+            for (j = 0; j < 8; j++) {
+                if (empty(board, i, j)) {
+                    doit(board, i, j);
+                }
+            }
+        }
+    }
+    function do_move(black, i, j) {
         // ai move
         if (typeof i == 'undefined') {
             var variants = [];
-            for (i = 0; i < 8; i++) {
-                for (j = 0; j < 8; j++) {
-                    if (empty(i, j)) {
-                        clone_board_in_ai_mind();
-                        if (vectors('think')) {
-                            think_board[i][j] = color;
-                            variants.push({
-                                i: i,
-                                j: j,
-                                cost: estimate_board_in_mind(color)
-                            });
+            for_each_empty_cell(board, function (board, i, j) {
+                var b = clone_board(board);
+                if (vectors(black, b, {i: i, j: j}, 'check')) {
+                    b[i][j] = black ? 'b' : 'w';
+                    variants.push({
+                        i: i,
+                        j: j,
+                        b: b,
+                        variants: [],
+                        cost: 0
+                    });
+                }
+            });
+            if (variants.length == 0) {
+                return false;
+            }
+            for (var x in variants) {
+                if (variants.hasOwnProperty(x)) {
+                    var v = variants[x];
+                    for_each_empty_cell(v.b, function (board, i, j) {
+                        var b = clone_board(board);
+                        if (vectors(!black, b, {i: i, j: j}, 'check')) {
+                            v.variants.push(estimate(b, black ? 'b' : 'w'));
                         }
-                    }
+                    });
+                    v.variants.sort();
+                    v.cost = v.variants.pop();
                 }
             }
             variants.sort(function (x, y) {
                 return y.cost - x.cost;
             });
-            console.log(variants);
-            if (variants.length == 0) {
-                return false;
-            }
             i = variants[0].i;
             j = variants[0].j;
         }
 
-        move_state = false;
-        color = black ? 'b' : 'w';
-        opcolor = black ? 'w' : 'b';
-
-        function try_vector(dir, delta) {
-            var t_i = i + delta * dir[0],
-                t_j = j + delta * dir[1];
-            if ((vector_state == 'turn' || vector_state == 'est') && delta > 0) {
-                if (vector_state == 'turn') {
-                    board[t_i][t_j] = color;
-                } else {
-                    think_board[t_i][t_j] = color;
-                }
-                try_vector(dir, delta - 1);
-            } else if (vector_state == 'check' || vector_state == 'look' || vector_state == 'think') {
-                if (0 <= t_i && t_i < 8 && 0 <= t_j && t_j < 8) {
-                    if (board[t_i][t_j] == opcolor) {
-                        try_vector(dir, delta + 1);
-                    } else if (board[t_i][t_j] == color && delta > 1) {
-                        move_state = true;
-                        if (vector_state == 'check') {
-                            vector_state = 'turn';
-                            try_vector(dir, delta - 1);
-                        } else if (vector_state == 'think') {
-                            vector_state = 'est';
-                            try_vector(dir, delta - 1);
-                        }
-                    }
-                }
-            }
-        }
-        function vectors(action) {
-            console.log(action);
-            move_state = false;
-            for (var d in matrix) {
-                if (matrix.hasOwnProperty(d)) {
-                    vector_state = action;
-                    try_vector(matrix[d], 1);
-                }
-            }
-            return move_state;
-        }
-        function can_move(black) {
-            move_state = false;
-            color = black ? 'b' : 'w';
-            opcolor = black ? 'w' : 'b';
-            for (i = 0; i < 8; i++) {
-                for (j = 0; j < 8; j++) {
-                    if (empty(i, j)) {
-                        if (vectors('look')) {
-                            return true;
-                        }
-                    }
-                }
-            }
-            return false;
-        }
-        vectors('check');
         // successfull move
-        if (move_state) {
+        if (vectors(black, board, {i: i, j: j}, 'check')) {
             // mark position with color
-            board[i][j] = color;
+            board[i][j] = black ? 'b' : 'w';
             // check possibility of move
             if (can_move(!black)) {
                 // revert color
                 black = !black;
             } else if (!can_move(black)) {
-                end_game = true;
+                end_game = estimate(board, 'b') > 0 ? 'b' : 'w';
             }
         } else {
-            console.log('invalid move');
+            console.log('invalid move ' + (black ? 'b' : 'w')  + '' + i + '' + j);
         }
+        return black;
     }
 
     $.fn.reversi = function (color) {
