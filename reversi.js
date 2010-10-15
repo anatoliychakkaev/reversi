@@ -1,52 +1,126 @@
 (function ($) {
-    var black = true, end_game = false, container, think_board,
-    board = [
-        '0 0 0 0 0 0 0 0'.split(' '),
-        '0 0 0 0 0 0 0 0'.split(' '),
-        '0 0 0 0 0 0 0 0'.split(' '),
-        '0 0 0 w b 0 0 0'.split(' '),
-        '0 0 0 b w 0 0 0'.split(' '),
-        '0 0 0 0 0 0 0 0'.split(' '),
-        '0 0 0 0 0 0 0 0'.split(' '),
-        '0 0 0 0 0 0 0 0'.split(' ')
+    var s = /\s+/,
+    base_position = [
+        '0 0 0 0 0 0 0 0'.split(s),
+        '0 0 0 0 0 0 0 0'.split(s),
+        '0 0 0 0 0 0 0 0'.split(s),
+        '0 0 0 w b 0 0 0'.split(s),
+        '0 0 0 b w 0 0 0'.split(s),
+        '0 0 0 0 0 0 0 0'.split(s),
+        '0 0 0 0 0 0 0 0'.split(s),
+        '0 0 0 0 0 0 0 0'.split(s)
     ],
     costs = [
-        '9 2 4 4 4 4 2 9'.split(' '),
-        '2 1 3 3 3 3 1 2'.split(' '),
-        '4 2 3 2 2 3 2 4'.split(' '),
-        '4 3 2 1 1 2 3 4'.split(' '),
-        '4 3 2 1 1 2 3 4'.split(' '),
-        '4 2 3 2 2 3 2 4'.split(' '),
-        '2 1 3 3 3 3 1 2'.split(' '),
-        '9 2 4 4 4 4 2 9'.split(' ')
-    ];
+        '15 2 4 4 4 4 2 15'.split(s),
+        '2  1 3 3 3 3 1  2'.split(s),
+        '4  2 3 2 2 3 2  4'.split(s),
+        '4  3 2 1 1 2 3  4'.split(s),
+        '4  3 2 1 1 2 3  4'.split(s),
+        '4  2 3 2 2 3 2  4'.split(s),
+        '2  1 3 3 3 3 1  2'.split(s),
+        '15 2 4 4 4 4 2 15'.split(s)
+    ],
+    matrix = { 1: [0, 1], 2: [0, -1], 3: [1, 0], 4: [-1, 0], 5: [1, -1], 6: [1, 1], 7: [-1, -1], 8: [-1, 1] };
+    function Board(position, color) {
+        // store matrix of cells
+        this.position = position;
+        // boolean color (false => white, true => black)
+        // default black
+        this.color = typeof color == 'undefined' ? true : color;
+
+        // we can move?
+        if (!this.can_move()) {
+            // no. flip color
+            this.color = !this.color;
+            // can move now?
+            if (!this.can_move()) {
+                // no. game is over
+                this.terminal_board = true;
+            } else {
+                // yep. repeat same player
+                this.same_color_again = true;
+            }
+        }
+    }
+
     function empty(board, i, j) {
         return board[i][j] != 'w' && board[i][j] != 'b';
     }
-    function draw_board() {
-        var html = '<table class="reversi">', data = '';
+
+    Board.prototype.calc_board_stats = function () {
+        var i, j, w = 0, b = 0;
+        for (i = 0; i < 8; i++) {
+            for (j = 0; j < 8; j++) {
+                if (this.position[i][j] == 'b') {
+                    b++;
+                } else if (this.position[i][j] == 'w') {
+                    w++;
+                }
+            }
+        }
+        return {w: w, b: b};
+    }
+    Board.prototype.draw = function (container) {
+        var black = this.color,
+            end_game = this.terminal_board,
+            map = {
+                w: 'white',
+                b: 'black',
+                W: black ? 'empty' : 'move_here white',
+                B: !black ? 'empty' : 'move_here black',
+                0: 'empty'
+            }, html = '<table class="reversi">',
+            board_stats = this.calc_board_stats(),
+            info = '<span style="float:right;">' + board_stats.w + ':' + board_stats.b + '</span>';
         if (end_game) {
-            html += '<tr><td colspan="8" class="info">Победа ' + (end_game == 'b' ? 'черных' : 'белых') + '</td></tr>';
+            html += '<tr><td colspan="8" class="info">Победа ' + (board_stats.b > board_stats.w == 'b' ? 'черных' : 'белых') + info + '</td></tr>';
         } else {
-            html += '<tr><td colspan="8" class="info">Ход ' + (black ? 'Черных' : 'Белых') + '</td>';
+            html += '<tr><td colspan="8" class="info">Ход ' + (black ? 'Черных' : 'Белых') + info + '</td>';
         }
         for (var i = 0; i < 8; i++) {
             html += '<tr>';
             for (var j = 0; j < 8; j++) {
-                data = ' data-coords="' + i + ':' + j + '"';
-                if (empty(board, i, j)) {
-                    html += '<td class="empty"' + data +'>&nbsp;</td>';
-                } else if (board[i][j] == 'b') {
-                    html += '<td class="black"' + data +'>b</td>';
-                } else {
-                    html += '<td class="white"' + data +'>w</td>';
-                }
+                html += '<td class="' + map[this.position[i][j]] + '" data-coords="' + i + ':' + j + '">&nbsp;</td>';
             }
             html += '</tr>';
         }
         html += '</table>';
         container.html(html);
     }
+    Board.prototype.move = function (el) {
+        var coords = $(el).attr('data-coords');
+        if (!this.child_boards) {
+            this.calc_depth(1, coords);
+        }
+        return this.child_boards[coords];
+    };
+    Board.prototype.calc_depth = function (how_deep, point) {
+        var self = this;
+        if (!this.child_boards) {
+            this.child_boards = {};
+        }
+        if (point) {
+            var position = clone_board(this.position);
+            if (vectors(this.color, position, point, 'check')) {
+                this.child_boards[point] = new Board(position, !this.color);
+                if (how_deep > 1) {
+                    this.child_boards[point].calc_depth(how_deep - 1);
+                }
+            }
+        } else {
+            for_each_empty_cell(this.position, function (p, i, j) {
+                var position = clone_board(self.position);
+                if (vectors(this.color, position, {i: i, j: j}, 'check')) {
+                    self.child_boards[i + ':' + j] = new Board(position, !this.color);
+                }
+            });
+            if (how_deep > 1) {
+                for (var c in this.child_boards) {
+                    this.child_boards[c].calc_depth(how_deep - 1);
+                }
+            }
+        }
+    };
     function try_vector(black, board, point, action, dir, delta, move_state) {
         var color = black ? 'b' : 'w',
             opcolor = black ? 'w' : 'b',
@@ -55,15 +129,20 @@
         if (typeof move_state == 'undefined') {
             move_state = false;
         }
-        if (action == 'turn' && delta > 0) {
+        if (action == 'turn' && delta >= 0) {
             board[t_i][t_j] = color;
             new_delta = delta - 1;
+            if (new_delta == 0) {
+                board[point.i][point.j] = color;
+                return true;
+            }
         } else if (action == 'check' || action == 'look') {
             if (0 <= t_i && t_i < 8 && 0 <= t_j && t_j < 8) {
                 if (board[t_i][t_j] == opcolor) {
                     new_delta = delta + 1;
                 } else if (board[t_i][t_j] == color && delta > 1) {
                     if (action == 'look') {
+                        board[point.i][point.j] = color.toUpperCase();
                         return true;
                     }
                     move_state = true;
@@ -80,6 +159,10 @@
     }
     function vectors(black, board, point, action) {
         var move_state = false;
+        if (typeof point == 'string') {
+            point = point.split(':');
+            point = {i: parseInt(point[0], 10), j: parseInt(point[1], 10)};
+        }
         for (var d in matrix) {
             if (matrix.hasOwnProperty(d)) {
                 if (try_vector(black, board, point, action, matrix[d], 1)) {
@@ -89,19 +172,16 @@
         }
         return move_state;
     }
-    function can_move(black) {
-        for (i = 0; i < 8; i++) {
-            for (j = 0; j < 8; j++) {
-                if (empty(board, i, j)) {
-                    if (vectors(black, board, {i: i, j: j}, 'look')) {
-                        return true;
-                    }
-                }
+    Board.prototype.can_move = function () {
+        var self = this, result = true;
+        for_each_empty_cell(this.position, function (board, i, j) {
+            board[i][j] = '0';
+            if (vectors(self.color, self.position, {i: i, j: j}, 'look')) {
+                result = true;
             }
-        }
-        return false;
-    }
-    var matrix = { 1: [0, 1], 2: [0, -1], 3: [1, 0], 4: [-1, 0], 5: [1, -1], 6: [1, 1], 7: [-1, -1], 8: [-1, 1] };
+        });
+        return result;
+    };
     function clone_board(board) {
         var row, b = [];
         for (var i = 0; i < 8; i++) {
@@ -141,11 +221,15 @@
                 if (!black && !end_game) {
                     ai_move(black);
                 }
-            }, 500);
+            }, 1500);
         }
     }
     function for_each_empty_cell(board, doit) {
         var i, j;
+        if (typeof board == 'undefined') {
+            console.log(arguments.callee.caller.caller);
+            throw 'Board is undefined'
+        }
         for (i = 0; i < 8; i++) {
             for (j = 0; j < 8; j++) {
                 if (empty(board, i, j)) {
@@ -211,9 +295,48 @@
         return black;
     }
 
+    function Game(container, ai) {
+        var boards = [], board;
+
+        this.start = function (ai) {
+            board = new Board(base_position);
+            // board.calc_depth(2);
+            board.draw(container);
+            if (ai && ai == 'b') {
+                board = this.move();
+            }
+        };
+
+        this.move = function ($el) {
+            boards.push(board);
+            board = board.move($el);
+            board.draw(container);
+            if (ai && board.pwned_by(ai)) {
+                setTimeout(function () {
+                    this.move();
+                }, 1500);
+            }
+        };
+
+        this.undo = function () {
+            var player = board.pwned_by(),
+                prev = board,
+                board = boards.pop();
+            while (prev && prev.pwned_by(player)) {
+                boards.pop();
+                prev = boards[boards.length];
+            }
+            board.draw(container);
+        }
+
+        this.start();
+
+    }
+
     $.fn.reversi = function (color) {
-        container = this;
-        draw_board();
-        $('td.empty').live('click', move);
+        game = new Game(this);
+        $('td.move_here').live('click', function () {
+            game.move(this);
+        });
     };
 })(jQuery);
