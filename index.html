@@ -2,10 +2,36 @@
 <html>
   <meta http-equiv="Content-type" content="text/html; charset=utf-8" />
   <script src="jquery.js"></script>
+  <script src="tmpl.js"></script>
   <script src="reversi.js"></script>
-  <script>
+
+  <script type="text/html" id="board">
+    <table class="reversi">
+      <tr>
+        <td colspan="8" class="info">
+          <%= left_info %>
+          <span style="float:right;">
+            <%= right_info %>
+          </span>
+        </td>
+      </tr>
+      <% for (var i = 0; i < 8; i++) { %>
+        <tr>
+          <% for (var j = 0; j < 8; j++) { %>
+            <td class="<%= map[position[i][j]] %>" data-coords="<%= i + ':' + j %>">&nbsp;</td>
+          <% } %>
+        </tr>
+      <% } %>
+    </table>
+  </script>
+  <script type="text/javascript">
     $(function () {
-      $('body').reversi();
+      var game = $('body').reversi(function (data) {
+        this.html(tmpl('board', data)); 
+      });
+      $('td.move_here').live('click', function () {
+        game.move($(this).attr('data-coords'));
+      });
     });
   </script>
   <style>

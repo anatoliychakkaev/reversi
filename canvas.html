@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+  <meta http-equiv="Content-type" content="text/html; charset=utf-8" />
+  <script src="jquery.js"></script>
+  <script src="reversi.js"></script>
+
+  <script type="text/javascript">
+  $(function () {
+      var cell_size = 40;
+      var padding = 10;
+      var board_size = cell_size * 8 + padding * 2;
+      var board = document.getElementById('board');
+      var game;
+
+      board.width = board_size;
+      board.height = board_size;
+
+      function circle(r, style) {
+          if (!style) {
+              style = '#bbb,#ddd';
+          }
+          style = style.split(',');
+
+          context.fillStyle = '#bbb';
+          context.fillRect(0 - r, 0 - r, 0 + r, 0 + r);
+
+          context.save();
+
+          context.beginPath();
+          context.arc(0, 0, r, 0, Math.PI * 2, true);
+          context.closePath();
+          context.fillStyle = style[0];
+          context.fill();
+
+          context.strokeWeight = 1;
+          context.beginPath();
+          context.arc(0, 0, r, 0, Math.PI * 2, true);
+          context.strokeStyle = style[1];
+          context.stroke();
+          context.restore();
+      }
+
+      function initial_draw(position) {
+          var s = { b: '#000,#FFF', w: '#FFF,#000', 0: '#bbb,#bbb', W: '#bbb,#ddd', B: '#bbb,#999' };
+          for (var i = 0; i < 8; i++) {
+              for (var j = 0; j < 8; j++) {
+                  context.save();
+                  context.translate(padding + (j + 0.5) * cell_size, padding + (i + 0.5) * cell_size);
+                  context.scale(0.5, 1);
+                  circle(cell_size / 2 - 2, s[position[i][j]]);
+                  context.restore();
+              }
+          }
+      }
+
+      function clicked(x, y) {
+          var i = Math.ceil((y - padding) / 40) - 1;
+          var j = Math.ceil((x - padding) / 40) - 1;
+
+          context.fillStyle = '#FFF';
+          game.move(i + ':' + j);
+      }
+
+      var offset = $(board).offset();
+      $(board).click(function (e) {
+          clicked(e.clientX - offset.left, e.clientY - offset.top);
+      });
+
+      var context = board.getContext('2d');
+      context.fillStyle = "#bbb";
+      context.fillRect(0, 0, board_size, board_size);
+
+      context.fillStyle = "rgb(200,200,200)";
+
+      game = $('canvas#board').reversi(function (data) {
+          console.log(data);
+          initial_draw(data.position);
+      });
+  });
+  </script>
+  <body>
+    <canvas id="board" width="200" height="200"></canvas>
+  </body>
+</html>

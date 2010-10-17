@@ -1,38 +1,41 @@
 (function ($) {
-    var s = /\s+/,
-    base_position = [
-        '0 0 0 0 0 0 0 0'.split(s),
-        '0 0 0 0 0 0 0 0'.split(s),
-        '0 0 0 0 0 0 0 0'.split(s),
-        '0 0 0 w b 0 0 0'.split(s),
-        '0 0 0 b w 0 0 0'.split(s),
-        '0 0 0 0 0 0 0 0'.split(s),
-        '0 0 0 0 0 0 0 0'.split(s),
-        '0 0 0 0 0 0 0 0'.split(s)
-    ],
-    costs = [
-        '15 2 4 4 4 4 2 15'.split(s),
-        '2  1 3 3 3 3 1  2'.split(s),
-        '4  2 3 2 2 3 2  4'.split(s),
-        '4  3 2 1 1 2 3  4'.split(s),
-        '4  3 2 1 1 2 3  4'.split(s),
-        '4  2 3 2 2 3 2  4'.split(s),
-        '2  1 3 3 3 3 1  2'.split(s),
-        '15 2 4 4 4 4 2 15'.split(s)
-    ],
+    var s = /\s+/, undef,
     matrix = { 1: [0, 1], 2: [0, -1], 3: [1, 0], 4: [-1, 0], 5: [1, -1], 6: [1, 1], 7: [-1, -1], 8: [-1, 1] };
     function Board(position, color) {
-        // store matrix of cells
-        this.position = position;
         // boolean color (false => white, true => black)
         // default black
-        this.color = typeof color == 'undefined' ? true : color;
+        this.color = ( color == undef ) ? true : color;
 
-        // we can move?
+        this.init_position(position);
+    }
+
+    Board.prototype.init_position = function (position) {
+        var point,
+            i, j, w = 0, b = 0;
+
+        this.position = position;
+        this.empty_cells = [];
+        this.nonempty_cells = [];
+
+        // empty/nonempty cells and board stats
+        for (i = 0; i < 8; i++) {
+            for (j = 0; j < 8; j++) {
+                point = {i: i, j: j};
+                if (this.empty(i, j)) {
+                    this.empty_cells.push(point);
+                } else {
+                    this.nonempty_cells.push(point);
+                    if (this.position[i][j] == 'b') {
+                        b++;
+                    } else if (this.position[i][j] == 'w') {
+                        w++;
+                    }
+                }
+            }
+        }
+
         if (!this.can_move()) {
-            // no. flip color
             this.color = !this.color;
-            // can move now?
             if (!this.can_move()) {
                 // no. game is over
                 this.terminal_board = true;
@@ -41,58 +44,78 @@
                 this.same_color_again = true;
             }
         }
-    }
 
-    function empty(board, i, j) {
-        return board[i][j] != 'w' && board[i][j] != 'b';
-    }
+        this.board_stats = {b: b, w: w, moves: this.available_cells.length};
+    };
 
-    Board.prototype.calc_board_stats = function () {
-        var i, j, w = 0, b = 0;
-        for (i = 0; i < 8; i++) {
-            for (j = 0; j < 8; j++) {
-                if (this.position[i][j] == 'b') {
-                    b++;
-                } else if (this.position[i][j] == 'w') {
-                    w++;
-                }
-            }
-        }
-        return {w: w, b: b};
-    }
+    Board.prototype.empty = function (i, j) {
+        var c = this.position[i][j];
+        return c != 'w' && c != 'b';
+    };
+
+    $('empty_cell,nonempty_cell,available_cell'.split(',')).each(function(i, name) {
+        Board.prototype['each_' + name] = function (callback) {
+            var self = this
+            $(self[name + 's']).each(function (i, p) {
+                callback.apply(self, [p]);
+            });
+        };
+    });
+
     Board.prototype.draw = function (container) {
-        var black = this.color,
-            end_game = this.terminal_board,
-            map = {
-                w: 'white',
-                b: 'black',
-                W: black ? 'empty' : 'move_here white',
-                B: !black ? 'empty' : 'move_here black',
-                0: 'empty'
-            }, html = '<table class="reversi">',
-            board_stats = this.calc_board_stats(),
-            info = '<span style="float:right;">' + board_stats.w + ':' + board_stats.b + '</span>';
-        if (end_game) {
-            html += '<tr><td colspan="8" class="info">Победа ' + (board_stats.b > board_stats.w == 'b' ? 'черных' : 'белых') + info + '</td></tr>';
-        } else {
-            html += '<tr><td colspan="8" class="info">Ход ' + (black ? 'Черных' : 'Белых') + info + '</td>';
-        }
-        for (var i = 0; i < 8; i++) {
-            html += '<tr>';
-            for (var j = 0; j < 8; j++) {
-                html += '<td class="' + map[this.position[i][j]] + '" data-coords="' + i + ':' + j + '">&nbsp;</td>';
+        return {
+            prev_position: this.parent ? this.parent.position : undef,
+            position:   this.position,
+            map: {
+                w: 'white', b: 'black', 0: 'empty',
+                W: this.color ? 'empty' : 'move_here white',
+                B: !this.color ? 'empty' : 'move_here black',
+            },
+            right_info: this.board_stats.w + ':' + this.board_stats.b,
+            left_info:  this.terminal_board ?
+                'Победа ' + (this.board_stats.b > this.board_stats.w ? 'черных' : 'белых') :
+                'Ход ' + (this.color ? 'Черных' : 'Белых')
+        };
+    };
+    Board.prototype.move = function (coords) {
+        if (this.available_cells.length == 0) {
+            return false;
+        } else if (coords !== undef) {
+            var can_move = false;
+            this.each_available_cell(function (p) {
+                if (p.i + ":" + p.j == coords) {
+                    can_move = true;
+                }
+            });
+            if (!can_move) {
+                return false;
             }
-            html += '</tr>';
         }
-        html += '</table>';
-        container.html(html);
-    }
-    Board.prototype.move = function (el) {
-        var coords = $(el).attr('data-coords');
+        if (coords === undef) {
+            coords = this.ai();
+        }
         if (!this.child_boards) {
             this.calc_depth(1, coords);
         }
         return this.child_boards[coords];
+    };
+    Board.prototype.ai = function () {
+        if (this.color) {
+            var variants = [];
+            this.calc_depth(1);
+            this.each_available_cell(function (p) {
+                var pp = p.i + ':' + p.j;
+                variants.push({cost: this.child_boards[pp].cost, p: pp});
+            });
+            variants.sort(function (x, y) {
+                return -y.cost + x.cost;
+            });
+            console.log(variants);
+            return variants[0].p;
+        } else {
+            var i = Math.round((this.available_cells.length - 1) * Math.random());
+        }
+        return this.available_cells[i].i + ':' + this.available_cells[i].j;
     };
     Board.prototype.calc_depth = function (how_deep, point) {
         var self = this;
@@ -100,18 +123,23 @@
             this.child_boards = {};
         }
         if (point) {
-            var position = clone_board(this.position);
+            var position = this.clone_position();
             if (vectors(this.color, position, point, 'check')) {
-                this.child_boards[point] = new Board(position, !this.color);
+                board = new Board(position, !this.color);
+                board.parent = this;
+                this.child_boards[point] = board;
                 if (how_deep > 1) {
-                    this.child_boards[point].calc_depth(how_deep - 1);
+                    board.calc_depth(how_deep - 1);
                 }
             }
         } else {
-            for_each_empty_cell(this.position, function (p, i, j) {
-                var position = clone_board(self.position);
-                if (vectors(this.color, position, {i: i, j: j}, 'check')) {
-                    self.child_boards[i + ':' + j] = new Board(position, !this.color);
+            this.each_available_cell(function (point) {
+                var position = this.clone_position(), board;
+                if (vectors(this.color, position, point, 'check')) {
+                    board = new Board(position, !this.color);
+                    board.parent = this;
+                    board.estimate();
+                    self.child_boards[point.i + ':' + point.j] = board;
                 }
             });
             if (how_deep > 1) {
@@ -121,6 +149,46 @@
             }
         }
     };
+    Board.prototype.can_move = function () {
+        this.available_cells = [];
+        this.each_empty_cell(function (point) {
+            this.position[point.i][point.j] = '0';
+            if (vectors(this.color, this.position, point, 'look')) {
+                this.available_cells.push(point);
+            }
+        });
+        return this.available_cells.length;
+    };
+    Board.prototype.clone_position = function () {
+        var b = [], row;
+        for (var i = 0; i < 8; i++) {
+            row = [];
+            for (var j = 0; j < 8; j++) {
+                row.push(this.position[i][j]);
+            }
+            b.push(row);
+        }
+        return b;
+    };
+    Board.prototype.pwned_by = function (c) {
+        var color = this.color ? 'b' : 'w';
+        return color == c || c == 'x';
+    };
+    function vectors(black, board, point, action) {
+        var move_state = false;
+        if (typeof point == 'string') {
+            point = point.split(':');
+            point = {i: parseInt(point[0], 10), j: parseInt(point[1], 10)};
+        }
+        for (var d in matrix) {
+            if (matrix.hasOwnProperty(d)) {
+                if (try_vector(black, board, point, action, matrix[d], 1)) {
+                    move_state = true;
+                }
+            }
+        }
+        return move_state;
+    }
     function try_vector(black, board, point, action, dir, delta, move_state) {
         var color = black ? 'b' : 'w',
             opcolor = black ? 'w' : 'b',
@@ -157,87 +225,28 @@
             return try_vector(black, board, point, action, dir, new_delta, move_state)
         }
     }
-    function vectors(black, board, point, action) {
-        var move_state = false;
-        if (typeof point == 'string') {
-            point = point.split(':');
-            point = {i: parseInt(point[0], 10), j: parseInt(point[1], 10)};
-        }
-        for (var d in matrix) {
-            if (matrix.hasOwnProperty(d)) {
-                if (try_vector(black, board, point, action, matrix[d], 1)) {
-                    move_state = true;
-                }
-            }
-        }
-        return move_state;
-    }
-    Board.prototype.can_move = function () {
-        var self = this, result = true;
-        for_each_empty_cell(this.position, function (board, i, j) {
-            board[i][j] = '0';
-            if (vectors(self.color, self.position, {i: i, j: j}, 'look')) {
-                result = true;
-            }
+    var costs = [
+        '15 2 4 4 4 4 2 15'.split(s),
+        '2  1 3 3 3 3 1  2'.split(s),
+        '4  2 3 2 2 3 2  4'.split(s),
+        '4  3 2 1 1 2 3  4'.split(s),
+        '4  3 2 1 1 2 3  4'.split(s),
+        '4  2 3 2 2 3 2  4'.split(s),
+        '2  1 3 3 3 3 1  2'.split(s),
+        '15 2 4 4 4 4 2 15'.split(s)
+    ];
+    Board.prototype.estimate = function (color) {
+        var cost = 0, m = 1, c, board = this.position, color = (this.color ? 'b' : 'w');
+        this.each_nonempty_cell(function (point) {
+            c = board[point.i][point.j];
+            m = c == color ? 1 : -1;
+            cost += parseInt(costs[point.i][point.j], 10) * m;
         });
-        return result;
+        if (this.same_color_again) {
+            cost += 40;
+        }
+        this.cost = cost;
     };
-    function clone_board(board) {
-        var row, b = [];
-        for (var i = 0; i < 8; i++) {
-            row = [];
-            for (var j = 0; j < 8; j++) {
-                row.push(board[i][j]);
-            }
-            b.push(row);
-        }
-        return b;
-    }
-    function estimate(board, color) {
-        var cost = 0, m = 1, c;
-        for (var i = 0; i < 8; i++) {
-            for (var j = 0; j < 8; j++) {
-                c = board[i][j];
-                if (c != '0') {
-                    m = c == color ? 1 : -1;
-                    cost += parseInt(costs[i][j], 10) * m;
-                }
-            }
-        }
-        return cost;
-    }
-    function move(e) {
-        var cell = this;
-        var coords = $(cell).attr('data-coords').split(':');
-        black = do_move(black, parseInt(coords[0], 10), parseInt(coords[1], 10));
-        draw_board();
-        ai_move(black);
-    }
-    function ai_move() {
-        if (!black) {
-            setTimeout(function () {
-                black = do_move(black);
-                draw_board();
-                if (!black && !end_game) {
-                    ai_move(black);
-                }
-            }, 1500);
-        }
-    }
-    function for_each_empty_cell(board, doit) {
-        var i, j;
-        if (typeof board == 'undefined') {
-            console.log(arguments.callee.caller.caller);
-            throw 'Board is undefined'
-        }
-        for (i = 0; i < 8; i++) {
-            for (j = 0; j < 8; j++) {
-                if (empty(board, i, j)) {
-                    doit(board, i, j);
-                }
-            }
-        }
-    }
     function do_move(black, i, j) {
         // ai move
         if (typeof i == 'undefined') {
@@ -295,48 +304,69 @@
         return black;
     }
 
-    function Game(container, ai) {
-        var boards = [], board;
+    function Game(ai, drawer, container) { // {{{
+        var base_position = [
+            '0 0 0 0 0 0 0 0'.split(s),
+            '0 0 0 0 0 0 0 0'.split(s),
+            '0 0 0 0 0 0 0 0'.split(s),
+            '0 0 0 w b 0 0 0'.split(s),
+            '0 0 0 b w 0 0 0'.split(s),
+            '0 0 0 0 0 0 0 0'.split(s),
+            '0 0 0 0 0 0 0 0'.split(s),
+            '0 0 0 0 0 0 0 0'.split(s)
+        ];
+        this.external_drawer = drawer;
+        this.container = container;
 
         this.start = function (ai) {
-            board = new Board(base_position);
+            this.boards = [];
+            this.board = new Board(base_position);
             // board.calc_depth(2);
-            board.draw(container);
-            if (ai && ai == 'b') {
-                board = this.move();
+            this.draw();
+            if (ai && (ai == 'b' || ai == 'x')) {
+                this.move();
             }
         };
 
-        this.move = function ($el) {
-            boards.push(board);
-            board = board.move($el);
-            board.draw(container);
-            if (ai && board.pwned_by(ai)) {
+        this.move = function (coords) {
+            var self = this;
+            var board = this.board.move(coords);
+            if (board) {
+                this.boards.push(this.board);
+                this.board = board;
+                this.draw();
+            } else {
+                console.log('Invalid move');
+            }
+            if (ai && this.board.pwned_by(ai)) {
                 setTimeout(function () {
-                    this.move();
-                }, 1500);
+                    self.move();
+                }, 100);
             }
         };
 
         this.undo = function () {
-            var player = board.pwned_by(),
-                prev = board,
-                board = boards.pop();
+            var player = this.board.pwned_by(),
+            prev = this.board;
+            this.board = this.boards.pop();
             while (prev && prev.pwned_by(player)) {
-                boards.pop();
-                prev = boards[boards.length];
+                this.boards.pop();
+                prev = this.boards[boards.length];
             }
-            board.draw(container);
-        }
+            this.draw();
+        };
 
-        this.start();
+        this.draw = function () {
+            this.external_drawer.apply(this.container, [this.board.draw()]);
+        };
 
+        this.start(ai);
+
+        // }}}
     }
 
-    $.fn.reversi = function (color) {
-        game = new Game(this);
-        $('td.move_here').live('click', function () {
-            game.move(this);
-        });
+    $.fn.reversi = function (drawer) {
+        return new Game('r', drawer, this);
     };
 })(jQuery);
+// vim:set foldmethod=marker
