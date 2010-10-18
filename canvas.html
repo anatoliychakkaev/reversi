@@ -6,6 +6,7 @@
 
   <script type="text/javascript">
   $(function () {
+      var undef;
       var cell_size = 40;
       var padding = 10;
       var board_size = cell_size * 8 + padding * 2;
@@ -15,16 +16,16 @@
       board.width = board_size;
       board.height = board_size;
 
+      function clear(r) {
+          context.fillStyle = '#bbb';
+          context.fillRect(-cell_size/2, -cell_size/2, cell_size, cell_size);
+      }
+
       function circle(r, style) {
           if (!style) {
               style = '#bbb,#ddd';
           }
           style = style.split(',');
-
-          context.fillStyle = '#bbb';
-          context.fillRect(0 - r, 0 - r, 0 + r, 0 + r);
-
-          context.save();
 
           context.beginPath();
           context.arc(0, 0, r, 0, Math.PI * 2, true);
@@ -37,20 +38,53 @@
           context.arc(0, 0, r, 0, Math.PI * 2, true);
           context.strokeStyle = style[1];
           context.stroke();
+      }
+
+      var s = { b: '#000,#FFF', w: '#FFF,#000', 0: '#bbb,#bbb', W: '#bbb,#ddd', B: '#bbb,#999' };
+
+      function place_chip(i, j, c) {
+          context.save();
+          context.translate((j + 0.5) * cell_size, (i + 0.5) * cell_size);
+          clear();
+          circle(cell_size / 2 - 2, s[c]);
           context.restore();
       }
 
       function initial_draw(position) {
-          var s = { b: '#000,#FFF', w: '#FFF,#000', 0: '#bbb,#bbb', W: '#bbb,#ddd', B: '#bbb,#999' };
           for (var i = 0; i < 8; i++) {
               for (var j = 0; j < 8; j++) {
-                  context.save();
-                  context.translate(padding + (j + 0.5) * cell_size, padding + (i + 0.5) * cell_size);
-                  context.scale(0.5, 1);
-                  circle(cell_size / 2 - 2, s[position[i][j]]);
-                  context.restore();
+                  place_chip(i, j, position[i][j]);
               }
           }
+      }
+
+      function animate_revert(diff, callback, step, what) {
+          var steps = [.8, .5, .3, .1, 'r', .1, .3, .5, .8, 1];
+          if (step === undef) {
+              step = 0;
+          }
+          if (what === undef) {
+              what = 'from';
+          }
+          if (!steps[step]) {
+              callback();
+              return;
+          }
+          if (steps[step] === 'r') {
+              what = 'to';
+              step++;
+          }
+          for (var p in diff) {
+              context.save();
+              context.translate((diff[p].j + 0.5) * cell_size, (diff[p].i + 0.5) * cell_size);
+              clear();
+              context.scale(steps[step], 1);
+              circle(cell_size / 2 - 2, s[diff[p][what]]);
+              context.restore();
+          }
+          setTimeout(function () {
+              animate_revert(diff, callback, step + 1, what);
+          }, 1000/35);
       }
 
       function clicked(x, y) {
@@ -69,12 +103,31 @@
       var context = board.getContext('2d');
       context.fillStyle = "#bbb";
       context.fillRect(0, 0, board_size, board_size);
+      context.translate(padding, padding);
 
-      context.fillStyle = "rgb(200,200,200)";
-
-      game = $('canvas#board').reversi(function (data) {
-          console.log(data);
-          initial_draw(data.position);
+      game = $('canvas#board').reversi('x', function (data) {
+          if (data.prev_position) {
+              var diff = [], from, to;
+              for (var i = 0; i < 8; i++) {
+                  for (var j = 0; j < 8; j++) {
+                      from = data.prev_position[i][j];
+                      to = data.position[i][j];
+                      if ((from == 'w' || from == 'b') && from != to) {
+                          diff.push({i:i,j:j,from:from,to:to});
+                      }
+                      if (from == 'W' || from == 'B') {
+                          if (to == 'b' || to == 'w') {
+                              place_chip(i, j, to);
+                          }
+                      }
+                  }
+              }
+              animate_revert(diff, function () {
+                  initial_draw(data.position);
+              });
+          } else {
+              initial_draw(data.position);
+          }
       });
   });
   </script>

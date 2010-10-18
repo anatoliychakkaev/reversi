@@ -340,8 +340,10 @@
             }
             if (ai && this.board.pwned_by(ai)) {
                 setTimeout(function () {
-                    self.move();
-                }, 100);
+                    if (!self.board.terminal_board) {
+                        self.move();
+                    }
+                }, 1000);
             }
         };
 
@@ -365,8 +367,8 @@
         // }}}
     }
 
-    $.fn.reversi = function (drawer) {
-        return new Game('r', drawer, this);
+    $.fn.reversi = function (ai, drawer) {
+        return new Game(ai, drawer, this);
     };
 })(jQuery);
 // vim:set foldmethod=marker
