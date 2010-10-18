@@ -343,7 +343,7 @@
                     if (!self.board.terminal_board) {
                         self.move();
                     }
-                }, 1000);
+                }, 500);
             }
         };
 

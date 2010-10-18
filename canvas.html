@@ -36,11 +36,12 @@
           context.strokeWeight = 1;
           context.beginPath();
           context.arc(0, 0, r, 0, Math.PI * 2, true);
+          context.globalAlpha = 0.5;
           context.strokeStyle = style[1];
           context.stroke();
       }
 
-      var s = { b: '#000,#FFF', w: '#FFF,#000', 0: '#bbb,#bbb', W: '#bbb,#ddd', B: '#bbb,#999' };
+      var s = { b: '#000,#000', w: '#fff,#fff', 0: '#bbb,#bbb', W: '#bbb,#ddd', B: '#bbb,#999' };
 
       function place_chip(i, j, c) {
           context.save();
