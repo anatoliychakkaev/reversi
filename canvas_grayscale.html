@@ -1,10 +1,22 @@
 <!DOCTYPE html>
 <html>
+<head>
   <meta http-equiv="Content-type" content="text/html; charset=utf-8" />
   <script src="jquery.js"></script>
   <script src="reversi.js"></script>
 
   <script type="text/javascript">
+
+  var colors = {
+    base: '#bbb',
+    b: '#666-#222-#000,#000',
+    w: '#fff-#ddd-#aaa,#aaa',
+    0: '#b4b4b4-#b0b0b0-#a0a0a0,#bbb,-',
+    W: '#ccc-#ccc-#aaa,#ccc,-',
+    B: '#999-#999-#777,#888,-'
+  };
+
+
   $(function () {
       var undef;
       var cell_size = 40;
@@ -18,7 +30,7 @@
       board.height = board_size;
 
       function clear(r) {
-          context.fillStyle = '#ccb';
+          context.fillStyle = colors.base;
           context.fillRect(-cell_size/2, -cell_size/2, cell_size, cell_size);
       }
 
@@ -53,19 +65,12 @@
           context.stroke();
       }
 
-      var s = {
-          b: '#666-#222-#000,#000',
-          w: '#fff-#e3e3e3-#afafaf,#aaa',
-          0: '#c2c2b4-#c2c2b0-#b0b0a0,#bbb,-',
-          // 0: '#b4b4b4-#b0b0b0-#999,#bbb,-',
-          W: '#ccc-#ccc-#aaa,#ccc,-',
-          B: '#888-#888-#666,#888,-' };
 
       function place_chip(i, j, c) {
           context.save();
           context.translate((j + 0.5) * cell_size, (i + 0.5) * cell_size);
           clear();
-          circle(cell_size / 2 - 2, s[c]);
+          circle(cell_size / 2 - 2, colors[c]);
           context.restore();
       }
 
@@ -80,6 +85,18 @@
                   place_chip(i, j, position[i][j]);
               }
           }
+      }
+
+      function draw_base() {
+        context.fillStyle = colors.base;
+        context.fillRect(0, 0, board_size, board_size);
+        context.translate(padding, padding);
+      }
+
+      function full_redraw() {
+        context.translate(-padding,-padding);
+        draw_base();
+        initial_draw(CURRENT_POSITION);
       }
 
       function animate_revert(diff, callback, step, what) {
@@ -101,10 +118,10 @@
           for (var p in diff) {
               context.save();
               context.translate((diff[p].j + 0.5) * cell_size, (diff[p].i + 0.5) * cell_size);
-              circle(cell_size / 2 - 0, s['0']);
+              circle(cell_size / 2 - 0, colors['0']);
               context.rotate(Math.PI*.25);
               context.scale(steps[step], 1);
-              circle(cell_size / 2 - 2, s[diff[p][what]]);
+              circle(cell_size / 2 - 2, colors[diff[p][what]]);
               context.restore();
           }
           setTimeout(function () {
@@ -125,7 +142,6 @@
           game.move(i + ':' + j);
       }
 
-      var offset = $(board).offset();
       $(board).click(function (e) {
           clicked(e.clientX - offset.left, e.clientY - offset.top);
       });
@@ -156,11 +172,9 @@
       });
 
       var context = board.getContext('2d');
-      context.fillStyle = "#c4c4b3";
-      context.fillRect(0, 0, board_size, board_size);
-      context.translate(padding, padding);
+      draw_base();
 
-      game = $('canvas#board').reversi('b', function (data) {
+      game = $('canvas#board').reversi('w', function (data) {
           if (data.prev_position) {
               var diff = [], from, to;
               for (var i = 0; i < 8; i++) {
@@ -184,9 +198,27 @@
               initial_draw(data.position);
           }
       });
+
+      $('input').live('keyup', function () {
+          colors[this.name] = this.value;
+          full_redraw();
+      });
+      var colors_html = '';
+      for (var i in colors) {
+          colors_html += '<input type="text" size="60" name="' + i + '" value="' + colors[i] + '" /><br />';
+      }
+      $('#colors').html(colors_html);
+      var offset = $(board).offset();
   });
   </script>
+  <style>
+    input {
+        font-family: monospace;
+    }
+  </style>
+  </head>
   <body>
+    <div id="colors"></div>
     <canvas id="board" width="200" height="200"></canvas>
   </body>
 </html>

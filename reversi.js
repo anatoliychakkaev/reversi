@@ -110,7 +110,6 @@
             variants.sort(function (x, y) {
                 return -y.cost + x.cost;
             });
-            console.log(variants);
             return variants[0].p;
         } else {
             var i = Math.round((this.available_cells.length - 1) * Math.random());
@@ -315,6 +314,7 @@
             '0 0 0 0 0 0 0 0'.split(s),
             '0 0 0 0 0 0 0 0'.split(s)
         ];
+        var lock = false;
         this.external_drawer = drawer;
         this.container = container;
 
@@ -329,6 +329,9 @@
         };
 
         this.move = function (coords) {
+            if (lock) {
+                return;
+            }
             var self = this;
             var board = this.board.move(coords);
             if (board) {
@@ -339,11 +342,13 @@
                 console.log('Invalid move');
             }
             if (ai && this.board.pwned_by(ai)) {
+                lock = true;
                 setTimeout(function () {
                     if (!self.board.terminal_board) {
+                        lock = false;
                         self.move();
                     }
-                }, 500);
+                }, 1000);
             }
         };
 
